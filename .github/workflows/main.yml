@@ -1,0 +1,54 @@
+name: CI/CD Pipeline a AWS EC2
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout del código
+        uses: actions/checkout@v3
+
+      - name: Iniciar sesión en Docker Hub
+        uses: docker/login-action@v2
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Construir imagen Docker y hacer Push
+        uses: docker/build-push-action@v4
+        with:
+          context: .
+          push: true
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/gestion-pedidos-app:latest
+
+  deploy-to-ec2:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Desplegar en EC2 vía SSH
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.EC2_HOST }}
+          username: ${{ secrets.EC2_USERNAME }}
+          key: ${{ secrets.EC2_SSH_KEY }}
+          script: |
+            # 1. Descargar la última imagen desde tu Docker Hub
+            sudo docker pull ${{ secrets.DOCKERHUB_USERNAME }}/gestion-pedidos-app:latest
+            
+            # 2. Detener y eliminar el contenedor anterior si ya existe uno corriendo
+            sudo docker stop gestion-pedidos-container || true
+            sudo docker rm gestion-pedidos-container || true
+            
+            # 3. Levantar el nuevo contenedor mapeando el puerto, el volumen EFS e inyectando las credenciales de AWS
+            sudo docker run -d \
+              --name gestion-pedidos-container \
+              -p 8080:8080 \
+              -v /mnt/efs/guias:/mnt/efs/guias \
+              -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
+              -e AWS_SESSION_TOKEN="${{ secrets.AWS_SESSION_TOKEN }}" \
+              ${{ secrets.DOCKERHUB_USERNAME }}/gestion-pedidos-app:latest
