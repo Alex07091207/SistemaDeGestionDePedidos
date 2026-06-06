@@ -103,28 +103,53 @@ public class GuiaDespachoService {
         return guiaDespachoRepository.findByTransportistaAndFecha(transportistaId, date);
     }
 
-    public void eliminarGuiaDespacho(Long id) {
-        guiaDespachoRepository.deleteById(id);
+   public void eliminarGuiaDespacho(Long id) {
+    GuiaDespacho guia = guiaDespachoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Guía de despacho no encontrada"));
+    
+    // Eliminar de S3 si existe
+    if (guia.getS3Key() != null && !guia.getS3Key().isEmpty()) {
+        try {
+            s3Service.eliminarGuiaDespacho(guia.getS3Key());
+        } catch (Exception e) {
+            System.err.println("Error al eliminar archivo de S3: " + e.getMessage());
+        }
     }
     
+    // Eliminar de BD
+    guiaDespachoRepository.deleteById(id);
+}
+    
     public GuiaDespacho actualizarGuiaDespacho(Long id, GuiaDespacho guiaDespacho) {
-        GuiaDespacho guiaExistente = guiaDespachoRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Guia de despacho no encontrada"));
-        
-        if (guiaDespacho.getTransportista() != null && guiaDespacho.getTransportista().getId() != null) {
-            Transportista transportista = transportistaRepository.findById(guiaDespacho.getTransportista().getId())
-                    .orElseThrow(() -> new RuntimeException("Transportista no encontrado"));
-            guiaExistente.setTransportista(transportista);
-        }
-        
-        if (guiaDespacho.getDireccionDestino() != null && !guiaDespacho.getDireccionDestino().isBlank()) {
-            guiaExistente.setDireccionDestino(guiaDespacho.getDireccionDestino());
-        }
-        
-        if (guiaDespacho.getFechaDespacho() != null) {
-            guiaExistente.setFechaDespacho(guiaDespacho.getFechaDespacho());
-        }
-        
-        return guiaDespachoRepository.save(guiaExistente);
+    GuiaDespacho guiaExistente = guiaDespachoRepository.findById(id)
+            .orElseThrow(() -> new RuntimeException("Guia de despacho no encontrada"));
+    
+    // Actualiza datos
+    if (guiaDespacho.getTransportista() != null && guiaDespacho.getTransportista().getId() != null) {
+        Transportista transportista = transportistaRepository.findById(guiaDespacho.getTransportista().getId())
+                .orElseThrow(() -> new RuntimeException("Transportista no encontrado"));
+        guiaExistente.setTransportista(transportista);
     }
+    
+    if (guiaDespacho.getDireccionDestino() != null && !guiaDespacho.getDireccionDestino().isBlank()) {
+        guiaExistente.setDireccionDestino(guiaDespacho.getDireccionDestino());
+    }
+    
+    if (guiaDespacho.getFechaDespacho() != null) {
+        guiaExistente.setFechaDespacho(guiaDespacho.getFechaDespacho());
+    }
+    
+    // NUEVO: Regenerar archivo en EFS y actualizar en S3
+    String nombreArchivo = "guia" + id + ".pdf";
+    File archivoActualizado = manejarArchivoTemporalEFS(guiaExistente, nombreArchivo);
+    String nuevoS3Key = s3Service.actualizarGuiaEnS3(
+        guiaExistente.getS3Key(), 
+        archivoActualizado, 
+        guiaExistente.getTransportista().getId(), 
+        nombreArchivo
+    );
+    guiaExistente.setS3Key(nuevoS3Key);
+    
+    return guiaDespachoRepository.save(guiaExistente);
+}
 }

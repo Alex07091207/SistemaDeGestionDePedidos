@@ -3,6 +3,10 @@ package com.gestiondepedidos.sistemadegestiondepedidos.services;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import com.gestiondepedidos.sistemadegestiondepedidos.entity.GuiaDespacho;
+import com.gestiondepedidos.sistemadegestiondepedidos.repository.GuiaDespachoRepository;
+
 import software.amazon.awssdk.core.ResponseBytes;
 import software.amazon.awssdk.core.sync.RequestBody;
 import software.amazon.awssdk.core.sync.ResponseTransformer; // Importación crucial
@@ -21,6 +25,9 @@ public class S3Service {
 
     @Value("${aws.s3.bucket-name}")
     private String bucketName;
+
+    @Autowired
+    GuiaDespachoRepository guiaDespachoRepository;
 
     // 1. SUBIR ARCHIVO CON ESTRUCTURA DE CARPETAS (Evaluado en pauta)
     public String subirGuiaDespacho(File archivoFisico, Long transportistaId, String nombreArchivo) {
@@ -48,13 +55,26 @@ public class S3Service {
         return objectBytes.asByteArray();
     }
 
-    // 3. ELIMINAR ARCHIVO EN S3
-    public void eliminarGuiaDespacho(String s3Key) {
-        DeleteObjectRequest request = DeleteObjectRequest.builder()
-                .bucket(bucketName)
-                .key(s3Key)
-                .build();
-
-        s3Client.deleteObject(request);
-    }
+  // Eliminar archivo en S3
+public void eliminarGuiaDespacho(String s3Key) {
+    DeleteObjectRequest request = DeleteObjectRequest.builder()
+            .bucket(bucketName)
+            .key(s3Key)
+            .build();
+    s3Client.deleteObject(request);
 }
+
+// Actualizar archivo en S3
+public String actualizarGuiaEnS3(String s3KeyAntiguo, File archivoNuevo, Long transportistaId, String nombreArchivo) {
+    // Eliminar archivo antiguo si existe
+    if (s3KeyAntiguo != null && !s3KeyAntiguo.isEmpty()) {
+        eliminarGuiaDespacho(s3KeyAntiguo);  
+    }
+    
+    // Subir archivo nuevo
+    return subirGuiaDespacho(archivoNuevo, transportistaId, nombreArchivo);
+}
+    
+    // 2. Subir archivo nuevo con estructura actualizada
+}
+
