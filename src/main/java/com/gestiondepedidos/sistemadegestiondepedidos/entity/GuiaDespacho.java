@@ -1,6 +1,7 @@
 package com.gestiondepedidos.sistemadegestiondepedidos.entity;
 
 import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
@@ -26,6 +27,7 @@ public class GuiaDespacho {
     
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "id_transportista", nullable = false)
+    @JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
     private Transportista transportista;
     
     private String direccionDestino;

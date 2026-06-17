@@ -16,6 +16,9 @@ public interface GuiaDespachoRepository extends JpaRepository<GuiaDespacho, Long
     @Query("SELECT g FROM GuiaDespacho g WHERE CAST(g.fechaDespacho AS date) = :fecha")
     List<GuiaDespacho> findByFecha(@Param("fecha") LocalDate fecha);
 
-    @Query("SELECT g FROM GuiaDespacho g WHERE g.transportista.id = :transportistaId AND CAST(g.fechaDespacho AS date) = :fecha")
-    List<GuiaDespacho> findByTransportistaAndFecha(@Param("transportistaId") Long transportistaId, @Param("fecha") LocalDate fecha);
+   @Query("SELECT g FROM GuiaDespacho g WHERE g.transportista.id = :transportistaId " +
+       "AND YEAR(g.fechaDespacho) = YEAR(:fecha) " +
+       "AND MONTH(g.fechaDespacho) = MONTH(:fecha) " +
+       "AND DAY(g.fechaDespacho) = DAY(:fecha)")
+List<GuiaDespacho> findByTransportistaAndFecha(@Param("transportistaId") Long transportistaId, @Param("fecha") LocalDate fecha);
 }
